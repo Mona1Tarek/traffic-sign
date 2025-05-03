@@ -75,7 +75,8 @@ def get_detected_sign_name(class_id, confidence):
 
 def detect_traffic_signs_from_video():
     # Open the webcam
-    cap = cv2.VideoCapture(0)
+    IP = '192.168.1.18'
+    cap = cv2.VideoCapture(f"http://{IP}:8080/?action=stream_0")
     
     if not cap.isOpened():
         print("Error: Could not access the camera.")
