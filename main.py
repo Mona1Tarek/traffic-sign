@@ -76,15 +76,17 @@ def get_detected_sign_name(class_id, confidence):
 
 def detect_traffic_signs_from_video():
     # Open the webcam
-    url = 'http://192.168.1.31:4747/video'
-    cap = cv2.VideoCapture(url)
-    
+    # url = 'http://192.168.1.31:4747/video'
+    # cap = cv2.VideoCapture(url)
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not access the camera.")
         return
     
     last_detected_sign_names = []
     frame_counter = 0  # Add frame counter
+
+    # Repeatedly reads frames from the camera, processes them, and displays detection
     while True:
         # Start timing for total processing
         total_start_time = time.time()
@@ -99,7 +101,7 @@ def detect_traffic_signs_from_video():
         # Get original dimensions
         height, width = frame.shape[:2]
 
-        # Preprocess the frame
+        # Preprocess  the frame to the expected model size 
         try:
             input_image = cv2.resize(frame, (640, 640))  # Resize to model's input size
             input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
@@ -112,7 +114,7 @@ def detect_traffic_signs_from_video():
         # Start timing for inference
         inference_start_time = time.time()
         
-        # Run inference
+        # Run Model Inference
         try:
             outputs = session.run(None, {input_name: input_image})[0]
         except Exception:
@@ -124,10 +126,8 @@ def detect_traffic_signs_from_video():
         # Define confidence threshold
         confidence_threshold = 0.6
 
-        # List to store detected sign names
-        detected_sign_names = []
-
         # Process detections
+        detected_sign_names = []  # Reset detected signs for this frame
         for i in range(outputs.shape[2]):
             row = outputs[0, :, i]
             
@@ -148,33 +148,24 @@ def detect_traffic_signs_from_video():
                 y2 = min(height, int((y + h / 2) * height / 640))
 
                 # Get the detected sign's name
+                # Adds sign names to the list of detections for that frame
                 sign_name = get_detected_sign_name(class_id, confidence)
-                if (sign_name) and (sign_name not in detected_sign_names):
+                if sign_name and sign_name not in detected_sign_names:
                     detected_sign_names.append(sign_name)
 
-                if detected_sign_names ==  last_detected_sign_names:
-                    pass
-                else:
-                    if frame_counter % 10 == 0:  # Only print every 10 frames
-                        if detected_sign_names:  # Only print if there are new detections
-                            total_time = (time.time() - total_start_time) * 1000  # Convert to milliseconds
-                            print(f'New Detection: {detected_sign_names}')
-                            print(f'Timing - Inference: {inference_time:.2f}ms, Total: {total_time:.2f}ms')
-                        last_detected_sign_names = detected_sign_names
-        # # Display the frame
-        # cv2.imshow('Detected Traffic Signs', frame)
+        # Check frame counter and print results
+        if frame_counter % 10 == 0:  # Only print every 10 frames
+            total_time = (time.time() - total_start_time) * 1000  # Convert to milliseconds
+            if detected_sign_names:  # Only print if there are new detections
+                print(f'New Detection: {detected_sign_names}')
+            else:
+                print('No signs detected')
+            print(f'Timing - Inference: {inference_time:.2f}ms, Total: {total_time:.2f}ms')
+            last_detected_sign_names = detected_sign_names.copy()  # Store a copy of current detections
 
-        # Print detected signs in the list (or use it elsewhere)
-        # if detected_sign_names:
-        #     print(f"Detected signs: {', '.join(detected_sign_names)}")
-
-        # # Exit on 'q'
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     break
 
     # Release the capture object and close all windows
     cap.release()
-    # cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     detect_traffic_signs_from_video()

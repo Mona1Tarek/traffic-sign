@@ -11,5 +11,5 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     command: ["python3", "main.py"]
-    # devices:
-    #   - "/dev/video0:/dev/video0"
+    devices:
+      - "/dev/video0:/dev/video0"
