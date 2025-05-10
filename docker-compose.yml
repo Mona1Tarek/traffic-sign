@@ -5,11 +5,11 @@ services:
     image: mona333/traffic-sign:latest
     # build: .
     ports:
-      - "8080:8080"
+      - "8080:8080" 
     volumes:
       - .:/app:ro
     environment:
       - PYTHONUNBUFFERED=1
     command: ["python3", "main.py"]
-#     devices:
-      # - "/dev/video0:/dev/video0"
+    # devices:
+    #   - "/dev/video0:/dev/video0"

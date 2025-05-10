@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import onnxruntime as ort
+import time  # Add time module import
 
 # Load the optimized ONNX model
 session = ort.InferenceSession("best_optimized.onnx", providers=["CPUExecutionProvider"])
@@ -73,29 +74,30 @@ def get_detected_sign_name(class_id, confidence):
         return english_class_name
     return None
 
-def process_video(video_path):
-    """
-    Process a video file to detect traffic signs
-    
-    Args:
-        video_path (str): Path to the input video file
-    """
-    # Open the video file
-    cap = cv2.VideoCapture(video_path)
+def detect_traffic_signs_from_video():
+    # Open the webcam
+    url = 'http://192.168.1.31:4747/video'
+    cap = cv2.VideoCapture(url)
     
     if not cap.isOpened():
-        print(f"Error: Could not open video file: {video_path}")
+        print("Error: Could not access the camera.")
         return
-
-    frame_count = 0
+    
+    last_detected_sign_names = []
+    frame_counter = 0  # Add frame counter
     while True:
+        # Start timing for total processing
+        total_start_time = time.time()
+        
         # Capture frame-by-frame
         ret, frame = cap.read()
         if not ret:
             break
 
-        frame_count += 1
-        print(f"Processing frame {frame_count}")
+        frame_counter += 1  # Increment frame counter
+
+        # Get original dimensions
+        height, width = frame.shape[:2]
 
         # Preprocess the frame
         try:
@@ -104,19 +106,23 @@ def process_video(video_path):
             input_image = input_image.astype(np.float32) / 255.0
             input_image = np.transpose(input_image, (2, 0, 1))
             input_image = np.expand_dims(input_image, axis=0)
-        except Exception as e:
-            print(f"Error preprocessing frame: {e}")
+        except Exception:
             continue
 
+        # Start timing for inference
+        inference_start_time = time.time()
+        
         # Run inference
         try:
             outputs = session.run(None, {input_name: input_image})[0]
-        except Exception as e:
-            print(f"Error running inference: {e}")
+        except Exception:
             continue
 
+        # Calculate inference time
+        inference_time = (time.time() - inference_start_time) * 1000  # Convert to milliseconds
+        
         # Define confidence threshold
-        confidence_threshold = 0.5
+        confidence_threshold = 0.6
 
         # List to store detected sign names
         detected_sign_names = []
@@ -126,6 +132,7 @@ def process_video(video_path):
             row = outputs[0, :, i]
             
             # Extract coordinates and scores
+            x, y, w, h = row[:4]
             class_scores = row[4:4+num_classes]
             
             # Find the best class
@@ -134,21 +141,40 @@ def process_video(video_path):
 
             # If confidence is above threshold, process detection
             if confidence > confidence_threshold:
+                # Convert YOLO format to pixel coordinates
+                x1 = max(0, int((x - w / 2) * width / 640))
+                y1 = max(0, int((y - h / 2) * height / 640))
+                x2 = min(width, int((x + w / 2) * width / 640))
+                y2 = min(height, int((y + h / 2) * height / 640))
+
                 # Get the detected sign's name
                 sign_name = get_detected_sign_name(class_id, confidence)
-                if sign_name:
+                if (sign_name) and (sign_name not in detected_sign_names):
                     detected_sign_names.append(sign_name)
 
-        # Print detected signs
-        if detected_sign_names:
-            print(f"Frame {frame_count} - Detected signs: {', '.join(detected_sign_names)}")
+                if detected_sign_names ==  last_detected_sign_names:
+                    pass
+                else:
+                    if frame_counter % 10 == 0:  # Only print every 10 frames
+                        if detected_sign_names:  # Only print if there are new detections
+                            total_time = (time.time() - total_start_time) * 1000  # Convert to milliseconds
+                            print(f'New Detection: {detected_sign_names}')
+                            print(f'Timing - Inference: {inference_time:.2f}ms, Total: {total_time:.2f}ms')
+                        last_detected_sign_names = detected_sign_names
+        # # Display the frame
+        # cv2.imshow('Detected Traffic Signs', frame)
 
-    # Release resources
+        # Print detected signs in the list (or use it elsewhere)
+        # if detected_sign_names:
+        #     print(f"Detected signs: {', '.join(detected_sign_names)}")
+
+        # # Exit on 'q'
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
+
+    # Release the capture object and close all windows
     cap.release()
+    # cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    # Define video path
-    video_path = "videos/vidd1.mp4"
-    
-    # Process the video
-    process_video(video_path) 
+    detect_traffic_signs_from_video()
